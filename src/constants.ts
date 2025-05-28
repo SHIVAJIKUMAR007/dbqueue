@@ -1,1 +1,1 @@
-export const dbListenerMessage = "dbqueue-new-message@#$%";
+export const dbListenerMessage = "dbqueue_new_message_notification";

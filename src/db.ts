@@ -12,14 +12,14 @@ CREATE TABLE IF NOT EXISTS db_message_queue (
   updated_at TIMESTAMP,
   retry_count INT DEFAULT 0
 );
-CREATE INDEX idx_topic_status ON db_message_queue (topic, status);`;
+CREATE INDEX  IF NOT EXISTS idx_topic_status ON db_message_queue (topic, status);`;
 
 export const query = (text: string, params?: any[]) => {
   if (!pool) throw new Error("Pool not initialized. Call initQueue() first.");
   return pool.query(text, params);
 };
 
-export function initQueue(connectionString: string) {
+export async function initQueue(connectionString: string) {
   if (pool) {
     // Optional: you can throw or just reuse existing pool
     pool.end(); // close old pool if you want to re-init
@@ -27,7 +27,7 @@ export function initQueue(connectionString: string) {
   conString = connectionString;
   pool = new Pool({ connectionString });
 
-  query(CREATE_QUEUE_TABLE);
+  await query(CREATE_QUEUE_TABLE);
 }
 
 export async function getClient(): Promise<PoolClient> {

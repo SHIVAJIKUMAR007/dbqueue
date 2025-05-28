@@ -1,9 +1,14 @@
 {
   "name": "pgdb-queue",
-  "version": "1.0.0",
-  "description": "Queue using Postgres database.",
+  "version": "1.0.3",
+  "description": "Asynchronous messaging queue using Postgres database.",
   "main": "dist/index.js",
-  "types": "index.d.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts"

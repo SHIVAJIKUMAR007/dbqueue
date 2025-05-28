@@ -12,25 +12,32 @@ export async function startConsumer(
 
   const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
   const rateLimitMs = options?.rateLimitMs ?? 1; // default: no delay
+  let draining = false;
 
   const drain = async () => {
-    let found = true;
-    while (found) {
-      found = false;
-      await consume(topic, async (msg, id) => {
-        found = true;
-        await handler(msg, id);
-        // rate limiting
-        if (rateLimitMs > 0) {
-          await delay(rateLimitMs);
-        }
-      });
+    if (draining) return;
+    draining = true;
+
+    try {
+      let found = true;
+      while (found) {
+        found = false;
+        await consume(topic, async (msg, id) => {
+          found = true;
+          await handler(msg, id);
+          if (rateLimitMs > 0) {
+            await delay(rateLimitMs);
+          }
+        });
+      }
+    } finally {
+      draining = false;
     }
   };
 
   client.on("notification", async (msg) => {
     if (msg.channel === dbListenerMessage && msg.payload === topic) {
-      drain(); // wake up and drain the queue
+      if (draining == false) drain(); // wake up and drain the queue
     }
   });
 

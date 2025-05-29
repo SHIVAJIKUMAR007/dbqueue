@@ -34,11 +34,7 @@ export const query = (text: string, params?: any[]) => {
   return pool.query(text, params);
 };
 
-export async function initQueue(
-  connectionString: string,
-  queueTableName: string,
-  maxRetry?: number
-) {
+export async function initQueue(connectionString: string, queueTableName: string, maxRetry?: number) {
   if (pool) {
     // Optional: you can throw or just reuse existing pool
     pool.end(); // close old pool if you want to re-init
@@ -56,10 +52,7 @@ export async function getClient(): Promise<PoolClient> {
 }
 
 export async function getListenerClient(): Promise<Client> {
-  if (conString == null)
-    throw new Error(
-      "Connection string is not defined. Call initQueue() first."
-    );
+  if (conString == null) throw new Error("Connection string is not defined. Call initQueue() first.");
   const client = new Client({ connectionString: conString });
   await client.connect();
   return client;

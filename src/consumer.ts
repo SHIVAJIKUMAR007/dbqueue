@@ -1,9 +1,6 @@
 import { getClient, getQueueTableName, getMaxRetryCount, query } from "./db";
 
-export async function consume(
-  topic: string,
-  handler: (msg: string, id: number) => Promise<void>
-) {
+export async function consume(topic: string, handler: (msg: string, id: number) => Promise<void>) {
   const client = await getClient();
   const queueTableName = getQueueTableName();
   const maxRetry = getMaxRetryCount();
@@ -41,17 +38,9 @@ export async function consume(
 
     try {
       await handler(message.message, message.id);
-      await query(
-        `UPDATE ${queueTableName}
-         SET status = 'done', updated_at = NOW()
-         WHERE id = $1`,
-        [message.id]
-      );
+      await query(`DELETE FROM ${queueTableName} WHERE id = $1`, [message.id]);
     } catch (handlerErr) {
-      console.error(
-        `Error in handler for message id ${message.id}:`,
-        handlerErr
-      );
+      console.error(`Error in handler for message id ${message.id}:`, handlerErr);
 
       await query(
         `UPDATE ${queueTableName}
@@ -72,4 +61,20 @@ export async function consume(
   } finally {
     client.release();
   }
+}
+
+export async function getFailedRecords(topic: string) {
+  const client = await getClient();
+  const queueTableName = getQueueTableName();
+  const maxRetry = getMaxRetryCount();
+  const { rows } = await client.query(
+    `SELECT * FROM ${queueTableName}
+       WHERE status = 'queued'
+         AND topic = $1
+         AND retry_count >= $2
+       ORDER BY id`,
+    [topic, maxRetry]
+  );
+
+  return rows;
 }

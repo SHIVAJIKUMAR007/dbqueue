@@ -1,4 +1,4 @@
-import { getClient, getQueueTableName, query } from "./db";
+import { getClient, getQueueTableName, getMaxRetryCount, query } from "./db";
 
 export async function consume(
   topic: string,
@@ -6,16 +6,20 @@ export async function consume(
 ) {
   const client = await getClient();
   const queueTableName = getQueueTableName();
+  const maxRetry = getMaxRetryCount();
+
   try {
     await client.query("BEGIN");
 
     const { rows } = await client.query(
       `SELECT * FROM ${queueTableName}
-        WHERE status = 'queued' AND topic = $1
-        ORDER BY id
-        LIMIT 1
-        FOR UPDATE SKIP LOCKED`,
-      [topic]
+       WHERE status = 'queued'
+         AND topic = $1
+         AND retry_count < $2
+       ORDER BY id
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED`,
+      [topic, maxRetry]
     );
 
     if (rows.length === 0) {
@@ -27,17 +31,20 @@ export async function consume(
 
     // Mark as processing
     await client.query(
-      `UPDATE ${queueTableName} SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+      `UPDATE ${queueTableName}
+       SET status = 'processing', updated_at = NOW()
+       WHERE id = $1`,
       [message.id]
     );
 
-    await client.query("COMMIT"); // release lock after claim
+    await client.query("COMMIT");
 
     try {
       await handler(message.message, message.id);
-
       await query(
-        `UPDATE ${queueTableName} SET status = 'done', updated_at = NOW() WHERE id = $1`,
+        `UPDATE ${queueTableName}
+         SET status = 'done', updated_at = NOW()
+         WHERE id = $1`,
         [message.id]
       );
     } catch (handlerErr) {
@@ -47,7 +54,11 @@ export async function consume(
       );
 
       await query(
-        `UPDATE ${queueTableName} SET status = 'queued', retry_count = retry_count + 1, updated_at = NOW() WHERE id = $1`,
+        `UPDATE ${queueTableName}
+         SET status = 'queued',
+             retry_count = retry_count + 1,
+             updated_at = NOW()
+         WHERE id = $1`,
         [message.id]
       );
     }

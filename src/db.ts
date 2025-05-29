@@ -4,6 +4,12 @@ let pool: Pool | null = null;
 let conString: string | null = null;
 let globalQueueTableName: string | null = null;
 
+let maxRetryCount: number = 5; // default, can override via initQueue()
+
+export function getMaxRetryCount() {
+  return maxRetryCount;
+}
+
 const getCreateQueueTableScript = (tableName: string) => {
   const CREATE_QUEUE_TABLE = `
 CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -30,7 +36,8 @@ export const query = (text: string, params?: any[]) => {
 
 export async function initQueue(
   connectionString: string,
-  queueTableName: string
+  queueTableName: string,
+  maxRetry?: number
 ) {
   if (pool) {
     // Optional: you can throw or just reuse existing pool
@@ -38,6 +45,7 @@ export async function initQueue(
   }
   conString = connectionString;
   globalQueueTableName = queueTableName;
+  if (maxRetry) maxRetryCount = maxRetry;
   pool = new Pool({ connectionString });
   await query(getCreateQueueTableScript(globalQueueTableName));
 }

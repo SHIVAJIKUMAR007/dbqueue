@@ -34,7 +34,10 @@ Before producing or consuming messages, initialize the queue:
 ```ts
 import { initQueue } from "pgdb-queue";
 
-await initQueue("postgres://user:password@host:port/database");
+await initQueue(
+  "postgres://user:password@host:port/database",
+  "schemaName.tableName"
+);
 ```
 
 This sets up the connection pool and ensures the `message_queue` table exists.
@@ -87,11 +90,17 @@ Automatically listens for new messages and drains the queue efficiently:
 ```ts
 import { startConsumer } from "pgdb-queue";
 
-await startConsumer("email-topic", async (msg, id) => {
-  const data = JSON.parse(msg);
-  console.log("Processing:", data);
-  // Your message handler logic
-});
+await startConsumer(
+  "email-topic",
+  async (msg, id) => {
+    const data = JSON.parse(msg);
+    console.log("Processing:", data);
+    // Your message handler logic
+  },
+  {
+    rateLimitMs: 10,
+  }
+);
 ```
 
 ### How it saves DB read costs
@@ -111,7 +120,7 @@ Perfect for scalable background jobs with low or bursty volume.
 The following table is automatically created (if missing):
 
 ```sql
-CREATE TABLE IF NOT EXISTS message_queue (
+CREATE TABLE IF NOT EXISTS schemaName.tableName (
   id SERIAL PRIMARY KEY,
   topic TEXT NOT NULL,
   message TEXT NOT NULL,
@@ -120,6 +129,7 @@ CREATE TABLE IF NOT EXISTS message_queue (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+CREATE INDEX  IF NOT EXISTS idx_topic_status ON schemaName.tableName (topic, status);
 ```
 
 > `message` is stored as `TEXT`.

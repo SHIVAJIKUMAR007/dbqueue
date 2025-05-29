@@ -1,16 +1,16 @@
-import { getClient, query } from "./db";
+import { getClient, getQueueTableName, query } from "./db";
 
 export async function consume(
   topic: string,
   handler: (msg: string, id: number) => Promise<void>
 ) {
   const client = await getClient();
-
+  const queueTableName = getQueueTableName();
   try {
     await client.query("BEGIN");
 
     const { rows } = await client.query(
-      `SELECT * FROM db_message_queue
+      `SELECT * FROM ${queueTableName}
         WHERE status = 'queued' AND topic = $1
         ORDER BY id
         LIMIT 1
@@ -27,7 +27,7 @@ export async function consume(
 
     // Mark as processing
     await client.query(
-      `UPDATE db_message_queue SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+      `UPDATE ${queueTableName} SET status = 'processing', updated_at = NOW() WHERE id = $1`,
       [message.id]
     );
 
@@ -37,7 +37,7 @@ export async function consume(
       await handler(message.message, message.id);
 
       await query(
-        `UPDATE db_message_queue SET status = 'done', updated_at = NOW() WHERE id = $1`,
+        `UPDATE ${queueTableName} SET status = 'done', updated_at = NOW() WHERE id = $1`,
         [message.id]
       );
     } catch (handlerErr) {
@@ -47,7 +47,7 @@ export async function consume(
       );
 
       await query(
-        `UPDATE db_message_queue SET status = 'queued', retry_count = retry_count + 1, updated_at = NOW() WHERE id = $1`,
+        `UPDATE ${queueTableName} SET status = 'queued', retry_count = retry_count + 1, updated_at = NOW() WHERE id = $1`,
         [message.id]
       );
     }
